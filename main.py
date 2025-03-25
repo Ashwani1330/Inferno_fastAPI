@@ -11,7 +11,6 @@ from sklearn.linear_model import LinearRegression
 import pandas as pd
 import numpy as np
 from datetime import datetime
-from mangum import Mangum
 
 app = FastAPI()
 
@@ -273,5 +272,3 @@ async def get_performance_analysis():
     # Clean the entire response to ensure JSON compatibility
     cleaned_result = clean_for_json(result)
     return cleaned_result
-
-handler = Mangum(app)
