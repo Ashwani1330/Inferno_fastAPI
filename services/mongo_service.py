@@ -15,3 +15,20 @@ class MongoService:
 
     async def get_performances(self):
         return await self.performance_collection.find().to_list(1000)
+
+    async def get_performances_optimized(self):
+        # Select only the fields you need
+        projection = {
+            "email": 1, 
+            "age": 1, 
+            "sceneType": 1, 
+            "difficulty": 1, 
+            "timeToFindExtinguisher": 1,
+            "timeToExtinguishFire": 1, 
+            "timeToTriggerAlarm": 1, 
+            "timeToFindExit": 1,
+            "performanceScore": 1, 
+            "timestamp": 1
+        }
+
+        return await self.performance_collection.find({}, projection).to_list(1000)
