@@ -10,3 +10,6 @@ scikit-learn
 scipy
 pydantic
 aiohttp
+fastapi-cache2
+Pillow
+redis
