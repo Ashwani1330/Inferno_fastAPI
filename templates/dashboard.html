@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Inferno VR Fire Safety Research Dashboard</title>
+    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body>
+    <div class="container">
+        <h1>Inferno VR Fire Safety Research Dashboard</h1>
+        <p>Anonymized data analysis for research on Immersive Navigation for Fire Emergency Response & Neutralization Operations</p>
+        
+        <div class="tab-container">
+            <div class="tab-buttons">
+                <button class="tab-button active" onclick="openTab(event, 'overview')">Overview</button>
+                <button class="tab-button" onclick="openTab(event, 'demographics')">Demographics</button>
+                <button class="tab-button" onclick="openTab(event, 'performance')">Performance Analysis</button>
+                <button class="tab-button" onclick="openTab(event, 'correlations')">Correlations</button>
+                <button class="tab-button" onclick="openTab(event, 'time-analysis')">Time Analysis</button>
+            </div>
+            
+            <div id="overview" class="tab-content" style="display: block;">
+                <h2>Key Metrics</h2>
+                <div class="metrics">
+                    <div class="metric-card">
+                        <div class="metric-value">{{ stats.participant_count }}</div>
+                        <div class="metric-label">Total Participants</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{ stats.avg_score }}</div>
+                        <div class="metric-label">Average Performance Score</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{ stats.avg_evacuation_time }} s</div>
+                        <div class="metric-label">Average Evacuation Time</div>
+                    </div>
+                    <div class="metric-card">
+                        <div class="metric-value">{{ stats.success_rate }}%</div>
+                        <div class="metric-label">Success Rate</div>
+                    </div>
+                </div>
+
+                <div class="chart-container">
+                    <h3>Performance Score Distribution</h3>
+                    <img src="{{ plots.performance_distribution.base64 }}" width="100%">
+                </div>
+
+                <div class="chart-container">
+                    <h3>Average Time by Task</h3>
+                    <img src="{{ plots.avg_time_by_task.base64 }}" width="100%">
+                </div>
+
+                {% if plots.participation_trend %}
+                <div class="chart-container">
+                    <h3>Participation Trend</h3>
+                    <img src="{{ plots.participation_trend.base64 }}" width="100%">
+                </div>
+                {% endif %}
+
+                <h3>Latest Records</h3>
+                <table>
+                    <tr>
+                        <th>User ID</th>
+                        <th>Age</th>
+                        <th>Scene</th>
+                        <th>Difficulty</th>
+                        <th>Score</th>
+                        <th>Date</th>
+                    </tr>
+                    {% for record in latest_records %}
+                    <tr>
+                        <td>{{ record.user_id }}</td>
+                        <td>{{ record.age }}</td>
+                        <td>{{ record.scene_type }}</td>
+                        <td>{{ record.difficulty }}</td>
+                        <td>{{ "%.2f"|format(record.score) }}</td>
+                        <td>{{ record.date }}</td>
+                    </tr>
+                    {% endfor %}
+                </table>
+            </div>
+
+            <div id="demographics" class="tab-content">
+                <h2>Demographic Analysis</h2>
+                
+                {% if plots.age_distribution %}
+                <div class="chart-container">
+                    <h3>Age Distribution</h3>
+                    <img src="{{ plots.age_distribution.base64 }}" width="100%">
+                </div>
+                {% endif %}
+                
+                {% if plots.performance_by_age %}
+                <div class="chart-container">
+                    <h3>Performance by Age Group</h3>
+                    <img src="{{ plots.performance_by_age.base64 }}" width="100%">
+                </div>
+                {% endif %}
+                
+                {% if plots.time_by_age %}
+                <div class="chart-container">
+                    <h3>Time Metrics by Age Group</h3>
+                    <img src="{{ plots.time_by_age.base64 }}" width="100%">
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Remaining tabs with similar template structure -->
+            <div id="performance" class="tab-content">
+                <h2>Performance Analysis</h2>
+                <!-- Performance tab content -->
+            </div>
+
+            <div id="correlations" class="tab-content">
+                <h2>Correlation Analysis</h2>
+                <!-- Correlations tab content -->
+            </div>
+
+            <div id="time-analysis" class="tab-content">
+                <h2>Time Series Analysis</h2>
+                <!-- Time analysis tab content -->
+            </div>
+        </div>
+        
+        <div style="margin-top: 30px;">
+            <h2>Research Insights</h2>
+            <p>This dashboard provides anonymized data from participants in the Inferno VR Fire-Safety Training program. The data presented here forms the basis for research on Immersive Navigation for Fire Emergency Response & Neutralization Operations.</p>
+            <p>Key insights:</p>
+            <ul>
+                <li>The average performance score across all participants is {{ stats.avg_score }}</li>
+                {% if stats.age_performance_correlation %}
+                <li>The relationship between age and performance shows {{ stats.age_performance_correlation }} correlation</li>
+                {% endif %}
+                <li>Success rate (positive performance score): {{ stats.success_rate }}%</li>
+                <li>Total number of training sessions: {{ stats.participant_count }}</li>
+            </ul>
+            <p>Updated: {{ stats.last_updated }}</p>
+        </div>
+    </div>
+
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

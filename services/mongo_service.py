@@ -1,8 +1,11 @@
+import logging
 import motor.motor_asyncio
 from dotenv import load_dotenv
 import os
 
 load_dotenv()
+
+logger = logging.getLogger(__name__)
 
 class MongoService:
     def __init__(self):
@@ -32,3 +35,11 @@ class MongoService:
         }
 
         return await self.performance_collection.find({}, projection).to_list(1000)
+
+    async def get_performance_count(self):
+        """Get the total count of performance records"""
+        try:
+            return await self.performance_collection.count_documents({})
+        except Exception as e:
+            logger.error(f"Error getting performance count: {str(e)}")
+            return 0
