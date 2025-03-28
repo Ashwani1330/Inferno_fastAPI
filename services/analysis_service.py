@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from scipy.stats import percentileofscore
 import matplotlib.pyplot as plt
+import seaborn as sns
 from io import BytesIO
 import base64
 
@@ -29,6 +30,81 @@ class AnalysisService:
             return np.nan
         return percentileofscore(valid_values, value)
 
+    def generate_scatterplot_matrix(self, df):
+        """Generate a scatterplot matrix for key performance variables"""
+        # Select relevant variables for the scatterplot matrix
+        perf_vars = ['performanceScore', 'timeToFindExtinguisher', 'timeToExtinguishFire', 
+                     'timeToTriggerAlarm', 'timeToFindExit']
+        
+        # Clean names for display
+        display_names = {
+            'performanceScore': 'Score',
+            'timeToFindExtinguisher': 'Find Extinguisher',
+            'timeToExtinguishFire': 'Extinguish Fire',
+            'timeToTriggerAlarm': 'Trigger Alarm',
+            'timeToFindExit': 'Find Exit'
+        }
+        
+        # Use only variables that exist in the dataframe
+        vars_to_use = [var for var in perf_vars if var in df.columns]
+        
+        if len(vars_to_use) < 2:
+            return None
+            
+        # Clean data - replace negatives with NaN
+        plot_df = df[vars_to_use].copy()
+        for col in plot_df.columns:
+            if col != 'performanceScore':  # Don't filter performance scores
+                plot_df[col] = plot_df[col].apply(lambda x: np.nan if x < 0 else x)
+        
+        # Drop rows with NaN values
+        plot_df = plot_df.dropna()
+        
+        if len(plot_df) < 10:  # Not enough data for meaningful visualization
+            return None
+            
+        # Create scatterplot matrix
+        plt.figure(figsize=(12, 10))
+        
+        # Rename columns for display
+        renamed_df = plot_df.rename(columns=display_names)
+        
+        # Create the scatterplot matrix with Seaborn
+        g = sns.pairplot(renamed_df, corner=True, diag_kind='kde', 
+                          plot_kws={'alpha': 0.6, 's': 80, 'edgecolor': 'k', 'linewidth': 0.5},
+                          diag_kws={'fill': True, 'alpha': 0.6})
+        
+        # Calculate and add correlation coefficients
+        for i, var1 in enumerate(renamed_df.columns):
+            for j, var2 in enumerate(renamed_df.columns):
+                if j > i:  # Upper triangle only
+                    corr = renamed_df[var1].corr(renamed_df[var2]).round(2)
+                    g.axes[i, j].annotate(f'r = {corr}', 
+                                          xy=(0.5, 0.9), 
+                                          xycoords='axes fraction',
+                                          ha='center',
+                                          va='center',
+                                          fontsize=10,
+                                          bbox=dict(boxstyle='round,pad=0.5', 
+                                                    fc='white', 
+                                                    alpha=0.8))
+        
+        plt.suptitle('Relationships Between Performance Variables', 
+                     fontsize=16, y=1.02)
+        plt.tight_layout()
+        
+        # Convert plot to base64 image
+        buf = BytesIO()
+        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        buf.seek(0)
+        image_base64 = base64.b64encode(buf.read()).decode('utf-8')
+        plt.close()
+        
+        return {
+            'base64': f'data:image/png;base64,{image_base64}',
+            'title': 'Scatterplot Matrix of Performance Variables'
+        }
+
     def generate_report(self, df, latest_record):
         # Clean data
         event_columns = ['timeToFindExtinguisher', 'timeToExtinguishFire', 'timeToTriggerAlarm', 'timeToFindExit']
@@ -55,6 +131,11 @@ class AnalysisService:
         for col in all_metrics:
             if col in df.columns:
                 graphs_html[col] = self.generate_metric_graph(col, latest_record[col], df[col])
+        
+        # Add scatterplot matrix to the report
+        scatterplot_matrix = self.generate_scatterplot_matrix(df)
+        if scatterplot_matrix:
+            graphs_html['scatterplot_matrix'] = f'<img src="{scatterplot_matrix["base64"]}" alt="Scatterplot Matrix" style="max-width:600px;"/>'
         
         # Create HTML report
         report_html = "<h1>Latest Performance Report</h1>"

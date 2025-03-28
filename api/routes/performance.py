@@ -1,6 +1,8 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 import pandas as pd
 import numpy as np
+import asyncio
+import io
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.model_selection import train_test_split
@@ -12,6 +14,7 @@ from services.email_service import EmailService
 from services.analysis_service import AnalysisService
 from utils.score_calculator import calculate_evacuation_efficiency_score
 from utils.helpers import parse_age, clean_for_json
+from tasks.background_tasks import trigger_analytics_update
 
 router = APIRouter()
 
@@ -48,6 +51,9 @@ async def create_performance(performance: PerformanceInput):
         }
         
         await mongo_service.insert_performance(performance_data)
+        
+        # Trigger analytics update in background
+        asyncio.create_task(trigger_analytics_update())
         
         # Generate and send report via email
         if performance.email:
@@ -232,3 +238,20 @@ async def get_performance_analysis():
     # Clean the entire response to ensure JSON compatibility
     cleaned_result = clean_for_json(result)
     return cleaned_result
+
+@router.get("/export/csv")
+async def export_csv():
+    performances = await mongo_service.get_performances()
+    df = pd.DataFrame(performances)
+    csv_data = df.to_csv(index=False)
+    return Response(content=csv_data, media_type="text/csv", headers={"Content-Disposition": "attachment; filename=performance_data.csv"})
+
+@router.get("/export/excel")
+async def export_excel():
+    performances = await mongo_service.get_performances()
+    df = pd.DataFrame(performances)
+    excel_buffer = io.BytesIO()
+    with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
+        df.to_excel(writer, index=False, sheet_name='Performance Data')
+    excel_buffer.seek(0)
+    return Response(content=excel_buffer.read(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": "attachment; filename=performance_data.xlsx"})

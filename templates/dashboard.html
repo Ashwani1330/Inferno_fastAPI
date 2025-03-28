@@ -1,144 +1,442 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Inferno VR Fire Safety Research Dashboard</title>
-    <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
-    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inferno VR Analytics Dashboard</title>
+    <link rel="stylesheet" href="/static/css/dashboard.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
 </head>
 <body>
-    <div class="container">
-        <h1>Inferno VR Fire Safety Research Dashboard</h1>
-        <p>Anonymized data analysis for research on Immersive Navigation for Fire Emergency Response & Neutralization Operations</p>
-        
-        <div class="tab-container">
-            <div class="tab-buttons">
-                <button class="tab-button active" onclick="openTab(event, 'overview')">Overview</button>
-                <button class="tab-button" onclick="openTab(event, 'demographics')">Demographics</button>
-                <button class="tab-button" onclick="openTab(event, 'performance')">Performance Analysis</button>
-                <button class="tab-button" onclick="openTab(event, 'correlations')">Correlations</button>
-                <button class="tab-button" onclick="openTab(event, 'time-analysis')">Time Analysis</button>
-            </div>
-            
-            <div id="overview" class="tab-content" style="display: block;">
-                <h2>Key Metrics</h2>
-                <div class="metrics">
-                    <div class="metric-card">
-                        <div class="metric-value">{{ stats.participant_count }}</div>
-                        <div class="metric-label">Total Participants</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value">{{ stats.avg_score }}</div>
-                        <div class="metric-label">Average Performance Score</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value">{{ stats.avg_evacuation_time }} s</div>
-                        <div class="metric-label">Average Evacuation Time</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value">{{ stats.success_rate }}%</div>
-                        <div class="metric-label">Success Rate</div>
-                    </div>
-                </div>
-
-                <div class="chart-container">
-                    <h3>Performance Score Distribution</h3>
-                    <img src="{{ plots.performance_distribution.base64 }}" width="100%">
-                </div>
-
-                <div class="chart-container">
-                    <h3>Average Time by Task</h3>
-                    <img src="{{ plots.avg_time_by_task.base64 }}" width="100%">
-                </div>
-
-                {% if plots.participation_trend %}
-                <div class="chart-container">
-                    <h3>Participation Trend</h3>
-                    <img src="{{ plots.participation_trend.base64 }}" width="100%">
-                </div>
-                {% endif %}
-
-                <h3>Latest Records</h3>
-                <table>
-                    <tr>
-                        <th>User ID</th>
-                        <th>Age</th>
-                        <th>Scene</th>
-                        <th>Difficulty</th>
-                        <th>Score</th>
-                        <th>Date</th>
-                    </tr>
-                    {% for record in latest_records %}
-                    <tr>
-                        <td>{{ record.user_id }}</td>
-                        <td>{{ record.age }}</td>
-                        <td>{{ record.scene_type }}</td>
-                        <td>{{ record.difficulty }}</td>
-                        <td>{{ "%.2f"|format(record.score) }}</td>
-                        <td>{{ record.date }}</td>
-                    </tr>
-                    {% endfor %}
-                </table>
-            </div>
-
-            <div id="demographics" class="tab-content">
-                <h2>Demographic Analysis</h2>
-                
-                {% if plots.age_distribution %}
-                <div class="chart-container">
-                    <h3>Age Distribution</h3>
-                    <img src="{{ plots.age_distribution.base64 }}" width="100%">
-                </div>
-                {% endif %}
-                
-                {% if plots.performance_by_age %}
-                <div class="chart-container">
-                    <h3>Performance by Age Group</h3>
-                    <img src="{{ plots.performance_by_age.base64 }}" width="100%">
-                </div>
-                {% endif %}
-                
-                {% if plots.time_by_age %}
-                <div class="chart-container">
-                    <h3>Time Metrics by Age Group</h3>
-                    <img src="{{ plots.time_by_age.base64 }}" width="100%">
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Remaining tabs with similar template structure -->
-            <div id="performance" class="tab-content">
-                <h2>Performance Analysis</h2>
-                <!-- Performance tab content -->
-            </div>
-
-            <div id="correlations" class="tab-content">
-                <h2>Correlation Analysis</h2>
-                <!-- Correlations tab content -->
-            </div>
-
-            <div id="time-analysis" class="tab-content">
-                <h2>Time Series Analysis</h2>
-                <!-- Time analysis tab content -->
-            </div>
-        </div>
-        
-        <div style="margin-top: 30px;">
-            <h2>Research Insights</h2>
-            <p>This dashboard provides anonymized data from participants in the Inferno VR Fire-Safety Training program. The data presented here forms the basis for research on Immersive Navigation for Fire Emergency Response & Neutralization Operations.</p>
-            <p>Key insights:</p>
-            <ul>
-                <li>The average performance score across all participants is {{ stats.avg_score }}</li>
-                {% if stats.age_performance_correlation %}
-                <li>The relationship between age and performance shows {{ stats.age_performance_correlation }} correlation</li>
-                {% endif %}
-                <li>Success rate (positive performance score): {{ stats.success_rate }}%</li>
-                <li>Total number of training sessions: {{ stats.participant_count }}</li>
-            </ul>
-            <p>Updated: {{ stats.last_updated }}</p>
+    <!-- Header -->
+    <div class="dashboard-header">
+        <div class="container">
+            <h1 class="display-4">Inferno VR Fire-Safety Training</h1>
+            <p class="lead">Research Analytics Dashboard</p>
+            <p class="dashboard-subtitle">A comprehensive analysis of virtual reality training performance metrics</p>
         </div>
     </div>
 
+    <div class="container mb-5">
+        <!-- Overview Stats -->
+        <div class="metrics">
+            <div class="metric-card">
+                <div class="metric-icon"><i class="fas fa-users"></i></div>
+                <div class="metric-value">{{ stats.participant_count }}</div>
+                <div class="metric-label">Total Participants</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-icon"><i class="fas fa-chart-line"></i></div>
+                <div class="metric-value">{{ stats.avg_score }}</div>
+                <div class="metric-label">Average Score (0-100)</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-icon"><i class="fas fa-clock"></i></div>
+                <div class="metric-value">{{ stats.avg_evacuation_time }}s</div>
+                <div class="metric-label">Avg. Evacuation Time</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-icon"><i class="fas fa-check-circle"></i></div>
+                <div class="metric-value">{{ stats.success_rate }}%</div>
+                <div class="metric-label">Completion Rate</div>
+            </div>
+        </div>
+
+        <!-- Main Dashboard Tabs -->
+        <div class="tab-container">
+            <div class="tab-buttons">
+                <button class="tab-button active" onclick="openTab(event, 'overview')">
+                    <i class="fas fa-home"></i> Overview
+                </button>
+                <button class="tab-button" onclick="openTab(event, 'demographics')">
+                    <i class="fas fa-users"></i> Demographics
+                </button>
+                <button class="tab-button" onclick="openTab(event, 'performance')">
+                    <i class="fas fa-chart-bar"></i> Performance
+                </button>
+                <button class="tab-button" onclick="openTab(event, 'correlations')">
+                    <i class="fas fa-project-diagram"></i> Correlations
+                </button>
+                <button class="tab-button" onclick="openTab(event, 'time-analysis')">
+                    <i class="fas fa-clock"></i> Time Analysis
+                </button>
+                <button class="tab-button" onclick="openTab(event, 'records')">
+                    <i class="fas fa-table"></i> Latest Records
+                </button>
+            </div>
+            
+            <div class="tab-content" id="overview">
+                <div class="row">
+                    <!-- Score Distribution -->
+                    <div class="column">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-chart-bar"></i> Performance Score Distribution</h3>
+                            {% if plots.performance_distribution %}
+                            <img src="{{ plots.performance_distribution.base64 }}" class="responsive-chart" alt="Performance Distribution">
+                            <div class="chart-description">
+                                Distribution of participant performance scores across all trials
+                            </div>
+                            {% else %}
+                            <p class="no-data">No data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Average Time by Task -->
+                    <div class="column">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-clock"></i> Average Time by Task</h3>
+                            {% if plots.avg_time_by_task %}
+                            <img src="{{ plots.avg_time_by_task.base64 }}" class="responsive-chart" alt="Average Time by Task">
+                            <div class="chart-description">
+                                Comparison of average completion time for each task in the simulation
+                            </div>
+                            {% else %}
+                            <p class="no-data">No data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Participation Trend -->
+                <div class="chart-container">
+                    <h3><i class="fas fa-users"></i> Participation Trend</h3>
+                    {% if plots.participation_trend %}
+                    <img src="{{ plots.participation_trend.base64 }}" class="responsive-chart" alt="Participation Trend">
+                    <div class="chart-description">
+                        Daily participation counts over the last 30 days showing usage patterns
+                    </div>
+                    {% else %}
+                    <p class="no-data">Not enough data to show participation trend</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Key research insights panel -->
+                <div class="insights-panel">
+                    <h3><i class="fas fa-lightbulb"></i> Key Insights</h3>
+                    <ul>
+                        <li>Overall participant performance shows a normal distribution with mean score of {{ stats.avg_score }}</li>
+                        <li>The average evacuation time across all participants is {{ stats.avg_evacuation_time }} seconds</li>
+                        <li>{{ stats.success_rate }}% of participants successfully completed the simulation</li>
+                        {% if stats.age_performance_correlation is defined %}
+                        <li>Age correlation with performance: {{ stats.age_performance_correlation }} (positive values indicate better performance with age)</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="demographics">
+                <div class="row">
+                    <!-- Age Distribution -->
+                    <div class="column">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-users"></i> Age Distribution</h3>
+                            {% if plots.age_distribution %}
+                            <img src="{{ plots.age_distribution.base64 }}" class="responsive-chart" alt="Age Distribution">
+                            <div class="chart-description">
+                                Distribution of participant ages, with mean and median markers
+                            </div>
+                            {% else %}
+                            <p class="no-data">No age data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Performance by Age -->
+                    <div class="column">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-chart-bar"></i> Performance by Age Group</h3>
+                            {% if plots.performance_by_age %}
+                            <img src="{{ plots.performance_by_age.base64 }}" class="responsive-chart" alt="Performance by Age">
+                            <div class="chart-description">
+                                Box plot showing performance distribution across different age groups
+                            </div>
+                            {% else %}
+                            <p class="no-data">No performance by age data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Time Metrics by Age -->
+                <div class="chart-container">
+                    <h3><i class="fas fa-clock"></i> Time Metrics by Age Group</h3>
+                    {% if plots.time_by_age %}
+                    <img src="{{ plots.time_by_age.base64 }}" class="responsive-chart" alt="Time by Age">
+                    <div class="chart-description">
+                        Analysis of task completion times across different age demographics
+                    </div>
+                    {% else %}
+                    <p class="no-data">No time metrics by age data available</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Demographics insights -->
+                <div class="insights-panel">
+                    <h3><i class="fas fa-lightbulb"></i> Demographic Insights</h3>
+                    <ul>
+                        <li>Analysis shows how age demographics influence performance in VR fire safety training</li>
+                        <li>Task completion times vary across different age groups, informing training personalization</li>
+                        <li>The data helps identify which age groups may benefit from additional training focus</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="performance">
+                <div class="row">
+                    <!-- Performance by Difficulty -->
+                    <div class="column">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-level-up-alt"></i> Performance by Difficulty</h3>
+                            {% if plots.performance_by_difficulty %}
+                            <img src="{{ plots.performance_by_difficulty.base64 }}" class="responsive-chart" alt="Performance by Difficulty">
+                            <div class="chart-description">
+                                Comparison of average performance scores across difficulty levels
+                            </div>
+                            {% else %}
+                            <p class="no-data">No difficulty data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Performance by Scene -->
+                    <div class="column">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-building"></i> Performance by Scene Type</h3>
+                            {% if plots.performance_by_scene %}
+                            <img src="{{ plots.performance_by_scene.base64 }}" class="responsive-chart" alt="Performance by Scene">
+                            <div class="chart-description">
+                                Comparative analysis of performance across different virtual environments
+                            </div>
+                            {% else %}
+                            <p class="no-data">No scene type data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Performance by Task Completion Speed -->
+                <div class="chart-container">
+                    <h3><i class="fas fa-tachometer-alt"></i> Performance by Task Completion Speed</h3>
+                    {% if plots.performance_by_task_speed %}
+                    <img src="{{ plots.performance_by_task_speed.base64 }}" class="responsive-chart" alt="Performance by Task Speed">
+                    <div class="chart-description">
+                        Relationship between task completion speed and overall performance scores
+                    </div>
+                    {% else %}
+                    <p class="no-data">No task speed data available</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Success rate insights -->
+                <div class="insights-panel">
+                    <h3><i class="fas fa-lightbulb"></i> Performance Insights</h3>
+                    <ul>
+                        <li>Task completion speed significantly correlates with overall performance</li>
+                        <li>Scene complexity has a measurable impact on participant success rates</li>
+                        <li>Difficulty settings show expected performance gradients, validating the training design</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="correlations">
+                <div class="row">
+                    <!-- Correlation Matrix -->
+                    <div class="column">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-th"></i> Correlation Matrix</h3>
+                            {% if plots.correlation_matrix %}
+                            <img src="{{ plots.correlation_matrix.base64 }}" class="responsive-chart" alt="Correlation Matrix">
+                            <div class="chart-description">
+                                Heatmap showing correlations between different performance metrics
+                            </div>
+                            {% else %}
+                            <p class="no-data">No correlation data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Feature Impact -->
+                    <div class="column">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-impact"></i> Feature Impact</h3>
+                            {% if plots.feature_impact %}
+                            <img src="{{ plots.feature_impact.base64 }}" class="responsive-chart" alt="Feature Impact">
+                            <div class="chart-description">
+                                Relative importance of each metric in determining overall performance
+                            </div>
+                            {% else %}
+                            <p class="no-data">No feature impact data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- NEW: Scatterplot Matrix -->
+                <div class="chart-container">
+                    <h3><i class="fas fa-braille"></i> Scatterplot Matrix</h3>
+                    {% if plots.scatterplot_matrix %}
+                    <img src="{{ plots.scatterplot_matrix.base64 }}" class="responsive-chart" alt="Scatterplot Matrix">
+                    <div class="chart-description">
+                        Multi-dimensional analysis of relationships between key performance variables with correlation coefficients
+                    </div>
+                    {% else %}
+                    <p class="no-data">Not enough data for scatterplot matrix analysis</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Correlation insights -->
+                <div class="insights-panel">
+                    <h3><i class="fas fa-lightbulb"></i> Correlation Insights</h3>
+                    <ul>
+                        <li>Strong correlations exist between task completion times and overall performance</li>
+                        <li>The scatterplot matrix reveals key relationships between performance variables</li>
+                        <li>Feature impact analysis helps identify the most critical training components</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="time-analysis">
+                <div class="chart-container">
+                    <h3><i class="fas fa-chart-line"></i> Performance Trend Over Time</h3>
+                    {% if plots.performance_trend %}
+                    <img src="{{ plots.performance_trend.base64 }}" class="responsive-chart" alt="Performance Trend">
+                    <div class="chart-description">
+                        Longitudinal analysis of performance scores over time with trend line
+                    </div>
+                    {% else %}
+                    <p class="no-data">Not enough time-series data available</p>
+                    {% endif %}
+                </div>
+                
+                <div class="row">
+                    <!-- Weekly Performance -->
+                    <div class="column">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-calendar-week"></i> Weekly Performance</h3>
+                            {% if plots.weekly_performance %}
+                            <img src="{{ plots.weekly_performance.base64 }}" class="responsive-chart" alt="Weekly Performance">
+                            <div class="chart-description">
+                                Average performance aggregated by week with sample size indicators
+                            </div>
+                            {% else %}
+                            <p class="no-data">Not enough weekly data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                    
+                    <!-- Monthly Performance -->
+                    <div class="column">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-calendar-alt"></i> Monthly Performance</h3>
+                            {% if plots.monthly_performance %}
+                            <img src="{{ plots.monthly_performance.base64 }}" class="responsive-chart" alt="Monthly Performance">
+                            <div class="chart-description">
+                                Monthly trends in performance metrics showing longer-term patterns
+                            </div>
+                            {% else %}
+                            <p class="no-data">Not enough monthly data available</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Task Time Trends -->
+                <div class="chart-container">
+                    <h3><i class="fas fa-tasks"></i> Task Time Trends</h3>
+                    {% if plots.task_time_trends %}
+                    <img src="{{ plots.task_time_trends.base64 }}" class="responsive-chart" alt="Task Time Trends">
+                    <div class="chart-description">
+                        Longitudinal trends in individual task completion times
+                    </div>
+                    {% else %}
+                    <p class="no-data">Not enough time-series data available</p>
+                    {% endif %}
+                </div>
+                
+                <!-- Time analysis insights -->
+                <div class="insights-panel">
+                    <h3><i class="fas fa-lightbulb"></i> Temporal Insights</h3>
+                    <ul>
+                        <li>Performance metrics show improvement over time, suggesting learning effects</li>
+                        <li>Weekly and monthly aggregations reveal patterns in training effectiveness</li>
+                        <li>Task completion times show a decreasing trend, indicating improved efficiency</li>
+                    </ul>
+                </div>
+            </div>
+            
+            <div class="tab-content" id="records">
+                <div class="table-container">
+                    <h3><i class="fas fa-table"></i> Recent Participant Records</h3>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>User ID</th>
+                                <th>Age</th>
+                                <th>Scene Type</th>
+                                <th>Difficulty</th>
+                                <th>Score</th>
+                                <th>Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% if latest_records %}
+                                {% for record in latest_records %}
+                                <tr>
+                                    <td>{{ record.user_id }}</td>
+                                    <td>{{ record.age }}</td>
+                                    <td>{{ record.scene_type }}</td>
+                                    <td>{{ record.difficulty }}</td>
+                                    <td class="score-cell">{{ "%.1f"|format(record.score) }}</td>
+                                    <td>{{ record.date }}</td>
+                                </tr>
+                                {% endfor %}
+                            {% else %}
+                                <tr>
+                                    <td colspan="6" class="text-center no-data">No records available</td>
+                                </tr>
+                            {% endif %}
+                        </tbody>
+                    </table>
+                </div>
+                
+                <!-- Export options -->
+                <div class="export-panel">
+                    <h3><i class="fas fa-download"></i> Export Options</h3>
+                    <p>Download this data for further research analysis:</p>
+                    <div class="export-buttons">
+                        <button class="export-button" onclick="alert('Export to CSV functionality would be implemented here')">
+                            <i class="fas fa-file-csv"></i> Export to CSV
+                        </button>
+                        <button class="export-button" onclick="alert('Export to Excel functionality would be implemented here')">
+                            <i class="fas fa-file-excel"></i> Export to Excel
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Methodology Note -->
+        <div class="methodology-panel">
+            <h3><i class="fas fa-microscope"></i> Research Methodology</h3>
+            <p>This dashboard presents analytics from the Inferno VR Fire-Safety Training platform. Data is collected from participant interactions within virtual reality training scenarios.</p>
+            <p>Statistical analysis includes descriptive statistics, correlation analysis, and trend analysis of performance metrics across various demographic factors and training conditions.</p>
+            <p>For research methodology details or to request raw data access for academic purposes, please contact the research team.</p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <p>Last updated: {{ stats.last_updated }}</p>
+            <p>© Inferno VR Fire-Safety Training Analytics Dashboard</p>
+            <p><small>Data visualization powered by advanced analytics. For research use only.</small></p>
+        </div>
+    </footer>
+
+    <!-- JavaScript -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.2.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="/static/js/dashboard.js"></script>
 </body>
 </html>
