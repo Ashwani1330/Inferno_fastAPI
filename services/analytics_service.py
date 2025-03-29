@@ -367,7 +367,7 @@ class AnalyticsService:
             if 'difficulty' in df.columns:
                 fig = plt.figure(figsize=(10, 6))
                 ax = sns.barplot(x='difficulty', y='performanceScore', data=df, palette='YlOrRd', 
-                                errorbar='sd', errwidth=1.5)
+                                errorbar='sd')
                 plt.xlabel('Difficulty Level')
                 plt.ylabel('Average Performance Score')
                 plt.title('Performance by Difficulty Level')
@@ -392,7 +392,7 @@ class AnalyticsService:
             if 'sceneType' in df.columns:
                 fig = plt.figure(figsize=(10, 6))
                 ax = sns.barplot(x='sceneType', y='performanceScore', data=df, palette='Blues_d',
-                                errorbar='sd', errwidth=1.5)
+                                errorbar='sd')
                 plt.xlabel('Scene Type')
                 plt.ylabel('Average Performance Score')
                 plt.title('Performance by Scene Type')
@@ -423,7 +423,7 @@ class AnalyticsService:
                 success_rates['scene'] = df.groupby('sceneType')['performanceScore'].apply(
                     lambda x: (x > 0).mean() * 100).to_dict()
             if 'age_group' in df.columns:
-                success_rates['age'] = df.groupby('age_group')['performanceScore'].apply(
+                success_rates['age'] = df.groupby('age_group', observed=True)['performanceScore'].apply(
                     lambda x: (x > 0).mean() * 100).to_dict()
                 
             stats['success_rates'] = success_rates

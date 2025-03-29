@@ -146,17 +146,23 @@ class AnalysisService:
             return None
         # Melt the dataframe for a unified box plot
         df_melt = df[available].melt(var_name='Task', value_name='Time')
+        # Remove NaN values to avoid "posx and posy should be finite values" errors
+        df_melt = df_melt.dropna()
+        
         plt.figure(figsize=(8, 6))
+        # Fix: use category for x variable, not hue with legend=False
         ax = sns.boxplot(x='Task', y='Time', data=df_melt, palette='Set2')
         plt.xlabel('Task')
         plt.ylabel('Completion Time (s)')
         plt.title('Task Completion Speed')
         plt.grid(True, alpha=0.3)
+        
         buf = BytesIO()
         plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
         buf.seek(0)
         image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
         plt.close()
+        
         return {
             'base64': f'data:image/png;base64,{image_base64}',
             'title': 'Task Completion Speed'
@@ -170,19 +176,37 @@ class AnalysisService:
         available = [f for f in features if f in df.columns]
         if not available:
             return None
-        correlations = {feat: df[feat].corr(df['performanceScore']) for feat in available}
+        
+        # Calculate correlations, handling potential NaN values
+        correlations = {}
+        for feat in available:
+            # Drop rows with NaN values for computing correlation
+            valid_data = df[[feat, 'performanceScore']].dropna()
+            if len(valid_data) > 1:  # Need at least 2 points for correlation
+                correlations[feat] = valid_data[feat].corr(valid_data['performanceScore'])
+            else:
+                correlations[feat] = 0  # Default for insufficient data
+        
         corr_series = pd.Series(correlations).sort_values(ascending=False)
+        
+        # Check if we have valid correlation values
+        if corr_series.isnull().all():
+            return None
+            
         plt.figure(figsize=(8, 6))
+        # Fix: use x and y directly instead of hue with legend=False
         ax = sns.barplot(x=corr_series.index, y=corr_series.values, palette='coolwarm')
         plt.xlabel('Feature')
         plt.ylabel('Correlation with Performance')
         plt.title('Feature Impact')
         plt.grid(True, alpha=0.3)
+        
         buf = BytesIO()
         plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
         buf.seek(0)
         image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
         plt.close()
+        
         return {
             'base64': f'data:image/png;base64,{image_base64}',
             'title': 'Feature Impact'
