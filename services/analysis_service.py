@@ -1,124 +1,165 @@
 import pandas as pd
 import numpy as np
 from scipy.stats import percentileofscore
+import matplotlib
+matplotlib.use('Agg')  # Ensure non-interactive backend is used
 import matplotlib.pyplot as plt
 import seaborn as sns
 from io import BytesIO
 import base64
+import logging
+
+logger = logging.getLogger(__name__)
 
 class AnalysisService:
     def generate_metric_graph(self, metric, latest_value, series):
-        plt.figure(figsize=(4, 3))
-        plt.hist(series.dropna(), bins=20, color='skyblue', edgecolor='black', alpha=0.7)
-        plt.axvline(latest_value, color='red', linestyle='dashed', linewidth=2)
-        plt.title(f"Distribution of {metric}")
-        plt.xlabel(metric)
-        plt.ylabel("Frequency")
-        plt.tight_layout()
-        
-        buf = BytesIO()
-        plt.savefig(buf, format='png')
-        buf.seek(0)
-        image_base64 = base64.b64encode(buf.read()).decode('utf-8')
-        plt.close()
-        
-        return f'<img src="data:image/png;base64,{image_base64}" alt="{metric} graph" style="max-width:600px;"/>'
+        try:
+            # Handle invalid values
+            valid_series = series.replace([np.inf, -np.inf], np.nan).dropna()
+            if len(valid_series) < 2:
+                return f'<div class="alert alert-warning">Insufficient data for {metric} visualization</div>'
+                
+            plt.figure(figsize=(4, 3))
+            plt.hist(valid_series, bins=20, color='skyblue', edgecolor='black', alpha=0.7)
+            plt.axvline(latest_value, color='red', linestyle='dashed', linewidth=2)
+            plt.title(f"Distribution of {metric}")
+            plt.xlabel(metric)
+            plt.ylabel("Frequency")
+            plt.tight_layout()
+            
+            buf = BytesIO()
+            plt.savefig(buf, format='png')
+            buf.seek(0)
+            image_base64 = base64.b64encode(buf.read()).decode('utf-8')
+            plt.close()
+            
+            return f'<img src="data:image/png;base64,{image_base64}" alt="{metric} graph" style="max-width:600px;"/>'
+        except Exception as e:
+            logger.error(f"Error generating metric graph for {metric}: {str(e)}")
+            return f'<div class="alert alert-danger">Error generating visualization for {metric}: {str(e)}</div>'
 
     def compute_percentile(self, series, value):
-        valid_values = series.dropna().tolist()
-        if len(valid_values) == 0:
+        try:
+            valid_values = series.replace([np.inf, -np.inf], np.nan).dropna().tolist()
+            if len(valid_values) < 2:
+                return np.nan
+            return percentileofscore(valid_values, value)
+        except Exception as e:
+            logger.error(f"Error computing percentile: {str(e)}")
             return np.nan
-        return percentileofscore(valid_values, value)
 
     def generate_enhanced_correlation_heatmap(self, df):
         """Generate an enhanced correlation heatmap with significance indicators"""
-        perf_vars = ['performanceScore', 'timeToFindExtinguisher', 'timeToExtinguishFire', 
-                     'timeToTriggerAlarm', 'timeToFindExit']
-        
-        vars_to_use = [var for var in perf_vars if var in df.columns]
-        
-        if len(vars_to_use) < 2:
-            return None
+        try:
+            perf_vars = ['performanceScore', 'timeToFindExtinguisher', 'timeToExtinguishFire', 
+                        'timeToTriggerAlarm', 'timeToFindExit']
             
-        plot_df = df[vars_to_use].copy()
-        for col in plot_df.columns:
-            if col != 'performanceScore':
-                plot_df[col] = plot_df[col].apply(lambda x: np.nan if x < 0 else x)
-        
-        plot_df = plot_df.dropna()
-        
-        if len(plot_df) < 5:
+            vars_to_use = [var for var in perf_vars if var in df.columns]
+            
+            if len(vars_to_use) < 2:
+                return None
+                
+            plot_df = df[vars_to_use].copy()
+            for col in plot_df.columns:
+                if col != 'performanceScore':
+                    plot_df[col] = plot_df[col].apply(lambda x: np.nan if x < 0 else x)
+            
+            # Replace inf values and drop NaNs entirely
+            plot_df = plot_df.replace([np.inf, -np.inf], np.nan).dropna()
+            
+            if len(plot_df) < 5:
+                return None
+            
+            display_names = {
+                'performanceScore': 'Performance Score',
+                'timeToFindExtinguisher': 'Find Extinguisher',
+                'timeToExtinguishFire': 'Extinguish Fire',
+                'timeToTriggerAlarm': 'Trigger Alarm',
+                'timeToFindExit': 'Find Exit'
+            }
+            
+            plot_df = plot_df.rename(columns=display_names)
+            
+            corr_matrix = plot_df.corr().round(2)
+            
+            p_values = pd.DataFrame(np.ones((len(corr_matrix), len(corr_matrix))), 
+                                   index=corr_matrix.index, columns=corr_matrix.columns)
+            
+            from scipy.stats import pearsonr
+            for i, row in enumerate(corr_matrix.index):
+                for j, col in enumerate(corr_matrix.columns):
+                    if i != j:
+                        stat, p = pearsonr(plot_df[row].values, plot_df[col].values)
+                        p_values.loc[row, col] = p
+            
+            mask = np.triu(np.ones_like(corr_matrix, dtype=bool))
+            
+            plt.figure(figsize=(10, 8))
+            
+            cmap = sns.diverging_palette(230, 20, as_cmap=True)
+            
+            sns.heatmap(corr_matrix, mask=mask, cmap=cmap, vmax=1, vmin=-1, center=0,
+                      square=True, linewidths=.5, cbar_kws={"shrink": .5}, annot=True)
+            
+            for i, row in enumerate(corr_matrix.index):
+                for j, col in enumerate(corr_matrix.columns):
+                    if i > j:
+                        corr_value = corr_matrix.iloc[i, j]
+                        p_value = p_values.iloc[i, j]
+                        # Add check to skip invalid values
+                        if not (np.isfinite(corr_value) and np.isfinite(p_value)):
+                            continue
+                        if p_value < 0.001:
+                            plt.text(j+0.5, i+0.85, '***', ha='center', va='center', color='white' if abs(corr_value) > 0.4 else 'black')
+                        elif p_value < 0.01:
+                            plt.text(j+0.5, i+0.85, '**', ha='center', va='center', color='white' if abs(corr_value) > 0.4 else 'black')
+                        elif p_value < 0.05:
+                            plt.text(j+0.5, i+0.85, '*', ha='center', va='center', color='white' if abs(corr_value) > 0.4 else 'black')
+            
+            plt.title('Enhanced Correlation Matrix with Significance Levels', fontsize=14)
+            plt.tight_layout()
+            
+            buf = BytesIO()
+            plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+            buf.seek(0)
+            image_base64 = base64.b64encode(buf.read()).decode('utf-8')
+            plt.close()
+            
+            return {
+                'base64': f'data:image/png;base64,{image_base64}',
+                'title': 'Enhanced Correlation Matrix'
+            }
+        except Exception as e:
+            logger.error(f"Error generating correlation heatmap: {str(e)}")
             return None
-        
-        display_names = {
-            'performanceScore': 'Performance Score',
-            'timeToFindExtinguisher': 'Find Extinguisher',
-            'timeToExtinguishFire': 'Extinguish Fire',
-            'timeToTriggerAlarm': 'Trigger Alarm',
-            'timeToFindExit': 'Find Exit'
-        }
-        
-        plot_df = plot_df.rename(columns=display_names)
-        
-        corr_matrix = plot_df.corr().round(2)
-        
-        p_values = pd.DataFrame(np.ones((len(corr_matrix), len(corr_matrix))), 
-                               index=corr_matrix.index, columns=corr_matrix.columns)
-        
-        from scipy.stats import pearsonr
-        for i, row in enumerate(corr_matrix.index):
-            for j, col in enumerate(corr_matrix.columns):
-                if i != j:
-                    stat, p = pearsonr(plot_df[row].values, plot_df[col].values)
-                    p_values.loc[row, col] = p
-        
-        mask = np.triu(np.ones_like(corr_matrix, dtype=bool))
-        
-        plt.figure(figsize=(10, 8))
-        
-        cmap = sns.diverging_palette(230, 20, as_cmap=True)
-        
-        sns.heatmap(corr_matrix, mask=mask, cmap=cmap, vmax=1, vmin=-1, center=0,
-                  square=True, linewidths=.5, cbar_kws={"shrink": .5}, annot=True)
-        
-        for i, row in enumerate(corr_matrix.index):
-            for j, col in enumerate(corr_matrix.columns):
-                if i > j:
-                    corr_value = corr_matrix.iloc[i, j]
-                    p_value = p_values.iloc[i, j]
-                    
-                    if p_value < 0.001:
-                        plt.text(j+0.5, i+0.85, '***', ha='center', va='center', color='white' if abs(corr_value) > 0.4 else 'black')
-                    elif p_value < 0.01:
-                        plt.text(j+0.5, i+0.85, '**', ha='center', va='center', color='white' if abs(corr_value) > 0.4 else 'black')
-                    elif p_value < 0.05:
-                        plt.text(j+0.5, i+0.85, '*', ha='center', va='center', color='white' if abs(corr_value) > 0.4 else 'black')
-        
-        plt.title('Enhanced Correlation Matrix with Significance Levels', fontsize=14)
-        plt.tight_layout()
-        
-        buf = BytesIO()
-        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
-        buf.seek(0)
-        image_base64 = base64.b64encode(buf.read()).decode('utf-8')
-        plt.close()
-        
-        return {
-            'base64': f'data:image/png;base64,{image_base64}',
-            'title': 'Enhanced Correlation Matrix'
-        }
 
     def generate_scatterplot_matrix(self, df):
         """Generate an optimized scatterplot matrix using seaborn pairplot."""
-        perf_vars = ['performanceScore', 'timeToFindExtinguisher', 'timeToExtinguishFire', 
-                     'timeToTriggerAlarm', 'timeToFindExit']
-        vars_to_use = [var for var in perf_vars if var in df.columns]
-        if len(vars_to_use) < 2:
-            return None
-        plot_df = df[vars_to_use].dropna()
-        if len(plot_df) > 100:
-            plot_df = plot_df.sample(n=100, random_state=42)
         try:
+            perf_vars = ['performanceScore', 'timeToFindExtinguisher', 'timeToExtinguishFire', 
+                        'timeToTriggerAlarm', 'timeToFindExit']
+            vars_to_use = [var for var in perf_vars if var in df.columns]
+            if len(vars_to_use) < 2:
+                return None
+                
+            # Make a copy to avoid modifying original data
+            plot_df = df[vars_to_use].copy()
+            
+            # Replace negative values with NaN
+            for col in plot_df.columns:
+                if col != 'performanceScore':
+                    plot_df[col] = plot_df[col].apply(lambda x: np.nan if x < 0 else x)
+                    
+            # Replace inf values and drop all NaNs
+            plot_df = plot_df.replace([np.inf, -np.inf], np.nan).dropna()
+            
+            if len(plot_df) < 5:
+                logger.warning(f"Not enough valid data points for scatterplot matrix: {len(plot_df)}")
+                return None
+                
+            if len(plot_df) > 100:
+                plot_df = plot_df.sample(n=100, random_state=42)
+                
             import seaborn as sns
             from io import BytesIO
             import base64
@@ -135,7 +176,7 @@ class AnalysisService:
                 'title': 'Scatterplot Matrix'
             }
         except Exception as e:
-            print(f"Scatterplot matrix generation error: {str(e)}")
+            logger.error(f"Scatterplot matrix generation error: {str(e)}")
             return None
 
     def generate_task_completion_speed(self, df):
@@ -147,7 +188,7 @@ class AnalysisService:
         # Melt the dataframe for a unified box plot
         df_melt = df[available].melt(var_name='Task', value_name='Time')
         # Remove NaN values to avoid "posx and posy should be finite values" errors
-        df_melt = df_melt.dropna()
+        df_melt = df_melt.replace([np.inf, -np.inf], np.nan).dropna()
         
         plt.figure(figsize=(8, 6))
         # Fix: use category for x variable, not hue with legend=False
@@ -181,7 +222,7 @@ class AnalysisService:
         correlations = {}
         for feat in available:
             # Drop rows with NaN values for computing correlation
-            valid_data = df[[feat, 'performanceScore']].dropna()
+            valid_data = df[[feat, 'performanceScore']].replace([np.inf, -np.inf], np.nan).dropna()
             if len(valid_data) > 1:  # Need at least 2 points for correlation
                 correlations[feat] = valid_data[feat].corr(valid_data['performanceScore'])
             else:

@@ -2,6 +2,8 @@ import pandas as pd
 import numpy as np
 import io
 import base64
+import matplotlib
+matplotlib.use('Agg')  # Set non-interactive backend
 import matplotlib.pyplot as plt
 import seaborn as sns
 from matplotlib.figure import Figure
@@ -34,6 +36,18 @@ class AnalyticsService:
         self.last_processed_count = 0
         self.last_update_time = None
 
+        # Silence matplotlib warnings
+        import warnings
+        warnings.filterwarnings("ignore", category=UserWarning, module="matplotlib")
+        
+        # Ensure we're using the right backend
+        if matplotlib.get_backend() != 'agg':
+            try:
+                matplotlib.use('Agg', force=True)
+                logger.info(f"Matplotlib backend set to: {matplotlib.get_backend()}")
+            except Exception as e:
+                logger.error(f"Failed to set matplotlib backend: {str(e)}")
+
     async def should_regenerate(self):
         """Determine if analytics need to be regenerated"""
         try:
@@ -61,54 +75,65 @@ class AnalyticsService:
 
     def optimize_plot(self, fig, title, dpi=80, quality=80, format='webp', max_width=800):
         """Optimize a matplotlib figure for web display and save to file system"""
-        plt.title(title)
-        plt.tight_layout()
-        
-        # Save figure to buffer
-        buf = io.BytesIO()
-        fig.savefig(buf, format='png', dpi=dpi, 
-                    bbox_inches='tight', pad_inches=0.1, transparent=False)
-        buf.seek(0)
-        
-        # Further optimize with PIL
-        img = Image.open(buf)
-        
-        # Resize if larger than max_width
-        if img.width > max_width:
-            ratio = max_width / img.width
-            new_height = int(img.height * ratio)
-            img = img.resize((max_width, new_height), Image.LANCZOS)
-        
-        # Generate filename from title
-        filename = title.lower().replace(' ', '_').replace('-', '_')
-        filepath = os.path.join(self.plots_dir, f"{filename}.{format}")
-        
-        # Save as optimized format
-        if format == 'webp':
-            img.save(filepath, format='WEBP', quality=quality)
-            mime_type = 'image/webp'
-        else:
-            img.save(filepath, format='PNG', optimize=True, quality=quality)
-            mime_type = 'image/png'
-        
-        # Also create a base64 version for direct embedding
-        out_buf = io.BytesIO()
-        if format == 'webp':
-            img.save(out_buf, format='WEBP', quality=quality)
-        else:
-            img.save(out_buf, format='PNG', optimize=True, quality=quality)
-        
-        out_buf.seek(0)
-        img_str = base64.b64encode(out_buf.getvalue()).decode('utf-8')
-        
-        # Close the figure to free memory
-        plt.close(fig)
-        
-        return {
-            'filepath': filepath,
-            'base64': f'data:{mime_type};base64,{img_str}',
-            'filename': f"{filename}.{format}"
-        }
+        try:
+            plt.title(title)
+            plt.tight_layout()
+            
+            # Save figure to buffer
+            buf = io.BytesIO()
+            fig.savefig(buf, format='png', dpi=dpi, 
+                        bbox_inches='tight', pad_inches=0.1, transparent=False)
+            buf.seek(0)
+            
+            # Further optimize with PIL
+            img = Image.open(buf)
+            
+            # Resize if larger than max_width
+            if img.width > max_width:
+                ratio = max_width / img.width
+                new_height = int(img.height * ratio)
+                img = img.resize((max_width, new_height), Image.LANCZOS)
+            
+            # Generate filename from title
+            filename = title.lower().replace(' ', '_').replace('-', '_')
+            filepath = os.path.join(self.plots_dir, f"{filename}.{format}")
+            
+            # Save as optimized format
+            if format == 'webp':
+                img.save(filepath, format='WEBP', quality=quality)
+                mime_type = 'image/webp'
+            else:
+                img.save(filepath, format='PNG', optimize=True, quality=quality)
+                mime_type = 'image/png'
+            
+            # Also create a base64 version for direct embedding
+            out_buf = io.BytesIO()
+            if format == 'webp':
+                img.save(out_buf, format='WEBP', quality=quality)
+            else:
+                img.save(out_buf, format='PNG', optimize=True, quality=quality)
+            
+            out_buf.seek(0)
+            img_str = base64.b64encode(out_buf.getvalue()).decode('utf-8')
+            
+            # Close the figure to free memory
+            plt.close(fig)
+            
+            return {
+                'filepath': filepath,
+                'base64': f'data:{mime_type};base64,{img_str}',
+                'filename': f"{filename}.{format}"
+            }
+        except Exception as e:
+            logger.error(f"Error optimizing plot '{title}': {str(e)}")
+            plt.close(fig)  # Ensure figure is closed even on error
+            
+            # Return a default empty image response
+            return {
+                'filepath': '',
+                'base64': 'data:image/png;base64,',
+                'filename': 'error.png'
+            }
 
     async def generate_alternative_visualizations(self, df=None):
         """Generate alternative visualizations to replace the scatterplot matrix"""
@@ -211,16 +236,9 @@ class AnalyticsService:
             # Convert to DataFrame and process
             df = pd.DataFrame(performances)
             
-            # Anonymize data - ensure emails are removed
-            if 'email' in df.columns:
-                logger.info(f"Anonymizing {len(df)} records by removing email addresses")
-                df['user_id'] = [f"User_{i+1}" for i in range(len(df))]
-                df = df.drop('email', axis=1)
-                
-                # Also anonymize any cached data
-                for perf in performances:
-                    if 'email' in perf:
-                        del perf['email']
+            # Use the anonymization utility instead of manual anonymization
+            from utils.anonymization import anonymize_dataframe
+            df = anonymize_dataframe(df)
             
             # Clean data
             event_columns = ['timeToFindExtinguisher', 'timeToExtinguishFire', 

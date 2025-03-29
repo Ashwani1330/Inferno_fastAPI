@@ -8,6 +8,12 @@ import logging
 from fastapi_cache.decorator import cache
 import pandas as pd
 import io
+import re
+import hashlib
+import matplotlib
+
+# Ensure matplotlib is configured correctly
+matplotlib.use('Agg')  # Force non-interactive backend
 
 from services.mongo_service import MongoService
 from services.analytics_service import AnalyticsService
@@ -24,6 +30,36 @@ analytics_service = AnalyticsService()
 # Set up templates
 templates_path = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "templates")
 templates = Jinja2Templates(directory=templates_path)
+
+# Email anonymization function
+def anonymize_email(text):
+    """
+    Anonymize email addresses found in text.
+    Preserves domain but replaces username with a hash.
+    """
+    if not isinstance(text, str):
+        return text
+        
+    # Regex to find email addresses
+    email_pattern = r'([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})'
+    
+    # Find all email addresses in the text
+    matches = re.findall(email_pattern, text)
+    
+    # If no emails found, return original text
+    if not matches:
+        return text
+        
+    # Replace each email with anonymized version
+    anonymized_text = text
+    for username, domain in matches:
+        original_email = f"{username}@{domain}"
+        # Create a hash of the username (take first 8 chars of hash)
+        hashed_username = hashlib.md5(username.encode()).hexdigest()[:8]
+        anonymized_email = f"{hashed_username}@{domain}"
+        anonymized_text = anonymized_text.replace(original_email, anonymized_email)
+    
+    return anonymized_text
 
 @router.get("/dashboard", response_class=HTMLResponse)
 # @cache(expire=60 * 5)  # Cache for 5 minutes
@@ -58,8 +94,11 @@ async def analytics_dashboard(request: Request):
                     
                     # Generate the alternative visualizations with timeout
                     try:
+                        # Run in executor to avoid matplotlib threading issues
+                        loop = asyncio.get_event_loop()
                         alt_viz = await asyncio.wait_for(
-                            analytics_service.generate_alternative_visualizations(df),
+                            loop.run_in_executor(None, 
+                                lambda: analytics_service.generate_alternative_visualizations(df)),
                             timeout=30.0
                         )
                         
@@ -153,36 +192,19 @@ async def export_data(export_type: str):
             raise HTTPException(status_code=404, detail="No performance data available")
         df = pd.DataFrame(performances)
         
-        # Log original columns for debugging
-        logger.info(f"Original columns before anonymization: {df.columns.tolist()}")
+        # Remove manual anonymization and use the utility function for comprehensive anonymization
+        from utils.anonymization import anonymize_dataframe
+        df = anonymize_dataframe(df)
         
-        # Anonymize data by removing email addresses
-        if 'email' in df.columns:
-            logger.info(f"Anonymizing data - removing {len(df)} email addresses")
-            # Create stable user IDs using index
-            df['user_id'] = [f"User_{i+1}" for i in range(len(df))]
-            # Remove email column
-            df = df.drop('email', axis=1)
-        else:
-            logger.info("No email column found in the data")
-            # Still add user_id for consistency
-            df['user_id'] = [f"User_{i+1}" for i in range(len(df))]
-        
-        # Double-check for any other PII columns that might need anonymization
-        pii_columns = ['email', 'name', 'address', 'phone', 'username']
-        for col in pii_columns:
-            if col in df.columns:
-                logger.info(f"Removing additional PII column: {col}")
-                df = df.drop(col, axis=1)
-        
-        # Log columns after anonymization
+        # Log columns after anonymization for debugging
         logger.info(f"Columns after anonymization: {df.columns.tolist()}")
         
+        # Final verification to ensure no emails are in the data
         stream = io.BytesIO()
         if export_type.lower() == "csv":
             df.to_csv(stream, index=False)
             media_type = "text/csv"
-            filename = "performance_data.csv"
+            filename = "anonymized_performance_data.csv"
         elif export_type.lower() == "excel":
             try:
                 # Try using openpyxl
@@ -194,7 +216,6 @@ async def export_data(export_type: str):
                     with pd.ExcelWriter(stream, engine="xlsxwriter") as writer:
                         df.to_excel(writer, index=False)
                 except ModuleNotFoundError:
-                    # If both packages are missing, return a helpful error
                     error_msg = (
                         "Excel export libraries are not installed. Please install required packages using:\n"
                         "pip install openpyxl xlsxwriter\n\n"
@@ -202,17 +223,17 @@ async def export_data(export_type: str):
                     )
                     raise HTTPException(status_code=500, detail=error_msg)
             media_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            filename = "performance_data.xlsx"
+            filename = "anonymized_performance_data.xlsx"
         else:
             raise HTTPException(status_code=400, detail="Invalid export type")
         
-        # Final verification to ensure no emails are in the data
-        if 'email' in df.columns:
-            logger.error("Email column still present after anonymization - forcing removal")
-            df = df.drop('email', axis=1)
-            
+        logger.info(f"Successfully exported anonymized data as {export_type}")
         stream.seek(0)
-        return StreamingResponse(stream, media_type=media_type, headers={"Content-Disposition": f"attachment; filename={filename}"})
+        return StreamingResponse(
+            stream, 
+            media_type=media_type, 
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
     except Exception as e:
         if isinstance(e, HTTPException):
             raise e

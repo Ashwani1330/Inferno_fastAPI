@@ -1,3 +1,7 @@
+# Configure matplotlib to use a non-interactive backend
+import matplotlib
+matplotlib.use('Agg')  # Set non-interactive backend before importing pyplot
+
 from fastapi import APIRouter
 from fastapi.responses import RedirectResponse
 

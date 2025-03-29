@@ -3,6 +3,8 @@ import logging
 from datetime import datetime
 import time
 from functools import wraps
+import matplotlib
+matplotlib.use('Agg')  # Set non-interactive backend
 
 from services.analytics_service import AnalyticsService
 from services.mongo_service import MongoService
@@ -40,6 +42,7 @@ async def update_analytics():
     """Update analytics data periodically"""
     try:
         logger.info("Running scheduled analytics update")
+        # Directly await the async process_data method
         await analytics_service.process_data()
         logger.info("Completed scheduled analytics update")
     except Exception as e:
@@ -108,5 +111,10 @@ def start_background_tasks():
 # Function to trigger analytics update when new performance is submitted
 async def trigger_analytics_update():
     """Trigger analytics update when new data is submitted"""
-    # Trigger analytics update that now includes additional visualization processing
-    await analytics_service.process_data()
+    try:
+        # Directly await process_data instead of using run_in_executor
+        await analytics_service.process_data()
+        return True
+    except Exception as e:
+        logger.error(f"Error triggering analytics update: {str(e)}")
+        return False
