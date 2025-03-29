@@ -108,4 +108,5 @@ def start_background_tasks():
 # Function to trigger analytics update when new performance is submitted
 async def trigger_analytics_update():
     """Trigger analytics update when new data is submitted"""
-    await run_task('check_new_data')
+    # Trigger analytics update that now includes additional visualization processing
+    await analytics_service.process_data()

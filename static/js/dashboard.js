@@ -49,10 +49,70 @@ document.addEventListener('DOMContentLoaded', function() {
         tabButton.className += " active";
     }
     
+    // Debug log to check if scatterplot matrix is loaded
+    const scatterplotImg = document.querySelector('#scatterplot-matrix');
+    if (scatterplotImg) {
+        console.log("Scatterplot Matrix found in DOM:", scatterplotImg.src.substring(0, 100) + "...");
+        
+        // Add event listeners for the scatterplot specifically
+        scatterplotImg.addEventListener('load', function() {
+            console.log("Scatterplot Matrix loaded successfully");
+        });
+        
+        scatterplotImg.addEventListener('error', function() {
+            console.error("Scatterplot Matrix failed to load");
+        });
+    } else {
+        console.warn("Scatterplot Matrix element not found in DOM");
+    }
+    
+    // Debug log for new visualizations
+    const ptImg = document.querySelector('img[alt="Performance Trend Over Time"]');
+    if (ptImg) {
+        ptImg.addEventListener('load', function() {
+            console.log("Performance Trend Over Time loaded successfully");
+        });
+        ptImg.addEventListener('error', function() {
+            console.error("Error loading Performance Trend Over Time visualization");
+        });
+    }
+    const taskSpeedImg = document.querySelector('img[alt="Task Completion Speed"]');
+    if (taskSpeedImg) {
+        taskSpeedImg.addEventListener('load', function() {
+            console.log("Task Completion Speed visualization loaded successfully");
+        });
+        taskSpeedImg.addEventListener('error', function() {
+            console.error("Error loading Task Completion Speed visualization");
+        });
+    }
+    const featureImpactImg = document.querySelector('img[alt="Feature Impact"]');
+    if (featureImpactImg) {
+        featureImpactImg.addEventListener('load', function() {
+            console.log("Feature Impact visualization loaded successfully");
+        });
+        featureImpactImg.addEventListener('error', function() {
+            console.error("Error loading Feature Impact visualization");
+        });
+    }
+    
     // Initialize interactive elements
     initializeChartToggles();
     initializeDataTableSorting();
     setupExportButtons();
+    
+    // Verify all chart images
+    verifyChartImages();
+    
+    // Fix jQuery-like selector for older browsers
+    if (!document.querySelector('.chart-container:has(#scatterplot-matrix)')) {
+        // Polyfill the :has selector for browsers that don't support it
+        const scatterplotTitle = Array.from(document.querySelectorAll('.chart-container h3')).find(
+            h3 => h3.textContent.includes('Scatterplot Matrix')
+        );
+        if (scatterplotTitle) {
+            window.scatterplotContainer = scatterplotTitle.closest('.chart-container');
+        }
+    }
 });
 
 // Toggle full size for charts when clicked
@@ -224,30 +284,14 @@ function sortTable(table, column, header) {
 
 // Setup export buttons functionality
 function setupExportButtons() {
-    const exportButtons = document.querySelectorAll('.export-button');
-    exportButtons.forEach(button => {
-        button.addEventListener('click', function() {
-            const exportType = this.textContent.includes('CSV') ? 'csv' : 'excel';
-            fetch(`/api/export/${exportType}`)
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`Failed to export data as ${exportType.toUpperCase()}`);
-                    }
-                    return response.blob();
-                })
-                .then(blob => {
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `performance_data.${exportType}`;
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                })
-                .catch(error => {
-                    alert(error.message);
-                });
-        });
+    // Direct CSV export
+    document.getElementById('csv-export').addEventListener('click', function() {
+        window.location.href = '/api/export/csv';
+    });
+    
+    // Direct Excel export
+    document.getElementById('excel-export').addEventListener('click', function() {
+        window.location.href = '/api/export/excel';
     });
 }
 
@@ -305,4 +349,150 @@ function printDashboardContent() {
     setTimeout(() => {
         printWindow.print();
     }, 500);
+}
+
+// Add improved error handling for chart images
+function handleImageError(img) {
+    console.error(`Failed to load image: ${img.alt}`);
+    
+    // Log additional details about the image
+    console.error(`Image source length: ${img.src.length}`);
+    console.error(`Image source starts with: ${img.src.substring(0, 30)}...`);
+    
+    // Replace the broken image with an error message
+    const container = img.parentElement;
+    const errorMsg = document.createElement('div');
+    errorMsg.className = 'image-error';
+    errorMsg.innerHTML = `
+        <div class="alert alert-warning">
+            <i class="fas fa-exclamation-triangle"></i> 
+            Failed to load visualization. The data may be insufficient or the visualization generation timed out.
+            <br><br>
+            <button class="btn btn-sm btn-primary refresh-viz-btn">Regenerate Visualization</button>
+        </div>
+    `;
+    container.replaceChild(errorMsg, img);
+    
+    // Add click handler for the regenerate button
+    const refreshBtn = errorMsg.querySelector('.refresh-viz-btn');
+    refreshBtn.addEventListener('click', function() {
+        this.disabled = true;
+        this.innerHTML = 'Regenerating...';
+        
+        // Call the refresh endpoint to regenerate the dashboard data
+        fetch('/analytics/dashboard/refresh')
+            .then(response => response.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    // Reload the page to show the refreshed data
+                    window.location.reload();
+                } else {
+                    errorMsg.innerHTML = `
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle"></i> 
+                            Failed to regenerate: ${data.message || 'Unknown error'}
+                        </div>
+                    `;
+                }
+            })
+            .catch(error => {
+                errorMsg.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-circle"></i> 
+                        Error: ${error.message || 'Failed to contact server'}
+                    </div>
+                `;
+            });
+    });
+}
+
+// Function to regenerate alternative visualizations
+function regenerateVisualizations() {
+    const correlationsTab = document.getElementById('correlations');
+    
+    // Find all visualization containers in the correlations tab
+    const vizContainers = correlationsTab.querySelectorAll('.chart-container:has(.image-error), .chart-container:has(.no-data)');
+    
+    vizContainers.forEach(container => {
+        // Save the original title
+        const title = container.querySelector('h3').innerHTML;
+        
+        // Replace with loading indicator
+        container.innerHTML = `
+            <h3>${title}</h3>
+            <div class="generating-indicator">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="visually-hidden">Loading...</span>
+                </div>
+                <p class="text-center mt-4">Generating visualizations... (This may take up to 30 seconds)</p>
+            </div>
+        `;
+    });
+    
+    // Call the endpoint to regenerate the visualizations
+    fetch('/analytics/dashboard/refresh')
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                // Reload the page to show the regenerated data
+                window.location.reload();
+            } else {
+                // Update containers with error message
+                vizContainers.forEach(container => {
+                    const title = container.querySelector('h3').innerHTML;
+                    container.innerHTML = `
+                        <h3>${title}</h3>
+                        <div class="image-error">
+                            <div class="alert alert-danger">
+                                <i class="fas fa-exclamation-circle"></i> 
+                                Failed to generate visualizations: ${data.message || 'Unknown error'}
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        })
+        .catch(error => {
+            // Update containers with error message
+            vizContainers.forEach(container => {
+                const title = container.querySelector('h3').innerHTML;
+                container.innerHTML = `
+                    <h3>${title}</h3>
+                    <div class="image-error">
+                        <div class="alert alert-danger">
+                            <i class="fas fa-exclamation-circle"></i> 
+                            Error: ${error.message || 'Failed to contact server'}
+                        </div>
+                    </div>
+                `;
+            });
+        });
+}
+
+// Replace the old regenerateScatterplot function with the new regenerateVisualizations function
+function regenerateScatterplot() {
+    regenerateVisualizations();
+}
+
+// Add a function to check all images on load
+function verifyChartImages() {
+    const charts = document.querySelectorAll('.responsive-chart');
+    charts.forEach(chart => {
+        // Check if the image has a valid src
+        if (chart.src) {
+            // Check minimal source length for base64 images
+            if (chart.src.startsWith('data:image') && chart.src.length < 100) {
+                console.warn(`Suspiciously short image data for ${chart.alt}`);
+                handleImageError(chart);
+            }
+            
+            // Add error handler
+            chart.addEventListener('error', function() {
+                handleImageError(this);
+            });
+        } else {
+            console.warn(`Missing source for chart: ${chart.alt}`);
+            handleImageError(chart);
+        }
+    });
 }

@@ -135,16 +135,16 @@ class AnalyticsService:
                 if col in df.columns:
                     df[col] = df[col].apply(lambda x: np.nan if x < 0 else x)
             
-            # 1. Generate enhanced correlation heatmap → renamed to correlation_matrix
+            # 1. Generate enhanced correlation heatmap
             try:
                 correlation_heatmap = analysis_service.generate_enhanced_correlation_heatmap(df)
                 if correlation_heatmap:
-                    alternative_visualizations['correlation_matrix'] = correlation_heatmap  # renamed key
-                    logger.info("Successfully generated correlation matrix")
+                    alternative_visualizations['correlation_heatmap'] = correlation_heatmap
+                    logger.info("Successfully generated enhanced correlation heatmap")
                 else:
-                    logger.warning("Could not generate correlation matrix")
+                    logger.warning("Could not generate enhanced correlation heatmap")
             except Exception as e:
-                logger.error(f"Error generating correlation matrix: {str(e)}")
+                logger.error(f"Error generating enhanced correlation heatmap: {str(e)}")
             
             # New: Generate scatterplot matrix
             try:
@@ -211,16 +211,10 @@ class AnalyticsService:
             # Convert to DataFrame and process
             df = pd.DataFrame(performances)
             
-            # Anonymize data - ensure emails are removed
+            # Anonymize data
             if 'email' in df.columns:
-                logger.info(f"Anonymizing {len(df)} records by removing email addresses")
                 df['user_id'] = [f"User_{i+1}" for i in range(len(df))]
                 df = df.drop('email', axis=1)
-                
-                # Also anonymize any cached data
-                for perf in performances:
-                    if 'email' in perf:
-                        del perf['email']
             
             # Clean data
             event_columns = ['timeToFindExtinguisher', 'timeToExtinguishFire', 

@@ -251,7 +251,23 @@ async def export_excel():
     performances = await mongo_service.get_performances()
     df = pd.DataFrame(performances)
     excel_buffer = io.BytesIO()
-    with pd.ExcelWriter(excel_buffer, engine='xlsxwriter') as writer:
-        df.to_excel(writer, index=False, sheet_name='Performance Data')
+    try:
+        # Try using openpyxl engine
+        with pd.ExcelWriter(excel_buffer, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name='Performance Data')
+    except ModuleNotFoundError as e1:
+        try:
+            # Fallback to xlsxwriter engine if openpyxl is not available
+            with pd.ExcelWriter(excel_buffer, engine="xlsxwriter") as writer:
+                df.to_excel(writer, index=False, sheet_name='Performance Data')
+        except ModuleNotFoundError as e2:
+            # Neither openpyxl nor xlsxwriter is installed
+            error_msg = (
+                "Excel export libraries are not installed. Please install required packages using:\n"
+                "pip install openpyxl xlsxwriter\n\n"
+                "Alternatively, you can use CSV export which doesn't require additional packages."
+            )
+            raise HTTPException(status_code=500, detail=error_msg) from e2
+    
     excel_buffer.seek(0)
     return Response(content=excel_buffer.read(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": "attachment; filename=performance_data.xlsx"})

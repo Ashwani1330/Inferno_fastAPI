@@ -30,70 +30,73 @@ class AnalysisService:
             return np.nan
         return percentileofscore(valid_values, value)
 
-    def generate_scatterplot_matrix(self, df):
-        """Generate a scatterplot matrix for key performance variables"""
-        # Select relevant variables for the scatterplot matrix
+    def generate_enhanced_correlation_heatmap(self, df):
+        """Generate an enhanced correlation heatmap with significance indicators"""
         perf_vars = ['performanceScore', 'timeToFindExtinguisher', 'timeToExtinguishFire', 
                      'timeToTriggerAlarm', 'timeToFindExit']
         
-        # Clean names for display
+        vars_to_use = [var for var in perf_vars if var in df.columns]
+        
+        if len(vars_to_use) < 2:
+            return None
+            
+        plot_df = df[vars_to_use].copy()
+        for col in plot_df.columns:
+            if col != 'performanceScore':
+                plot_df[col] = plot_df[col].apply(lambda x: np.nan if x < 0 else x)
+        
+        plot_df = plot_df.dropna()
+        
+        if len(plot_df) < 5:
+            return None
+        
         display_names = {
-            'performanceScore': 'Score',
+            'performanceScore': 'Performance Score',
             'timeToFindExtinguisher': 'Find Extinguisher',
             'timeToExtinguishFire': 'Extinguish Fire',
             'timeToTriggerAlarm': 'Trigger Alarm',
             'timeToFindExit': 'Find Exit'
         }
         
-        # Use only variables that exist in the dataframe
-        vars_to_use = [var for var in perf_vars if var in df.columns]
+        plot_df = plot_df.rename(columns=display_names)
         
-        if len(vars_to_use) < 2:
-            return None
-            
-        # Clean data - replace negatives with NaN
-        plot_df = df[vars_to_use].copy()
-        for col in plot_df.columns:
-            if col != 'performanceScore':  # Don't filter performance scores
-                plot_df[col] = plot_df[col].apply(lambda x: np.nan if x < 0 else x)
+        corr_matrix = plot_df.corr().round(2)
         
-        # Drop rows with NaN values
-        plot_df = plot_df.dropna()
+        p_values = pd.DataFrame(np.ones((len(corr_matrix), len(corr_matrix))), 
+                               index=corr_matrix.index, columns=corr_matrix.columns)
         
-        if len(plot_df) < 10:  # Not enough data for meaningful visualization
-            return None
-            
-        # Create scatterplot matrix
-        plt.figure(figsize=(12, 10))
+        from scipy.stats import pearsonr
+        for i, row in enumerate(corr_matrix.index):
+            for j, col in enumerate(corr_matrix.columns):
+                if i != j:
+                    stat, p = pearsonr(plot_df[row].values, plot_df[col].values)
+                    p_values.loc[row, col] = p
         
-        # Rename columns for display
-        renamed_df = plot_df.rename(columns=display_names)
+        mask = np.triu(np.ones_like(corr_matrix, dtype=bool))
         
-        # Create the scatterplot matrix with Seaborn
-        g = sns.pairplot(renamed_df, corner=True, diag_kind='kde', 
-                          plot_kws={'alpha': 0.6, 's': 80, 'edgecolor': 'k', 'linewidth': 0.5},
-                          diag_kws={'fill': True, 'alpha': 0.6})
+        plt.figure(figsize=(10, 8))
         
-        # Calculate and add correlation coefficients
-        for i, var1 in enumerate(renamed_df.columns):
-            for j, var2 in enumerate(renamed_df.columns):
-                if j > i:  # Upper triangle only
-                    corr = renamed_df[var1].corr(renamed_df[var2]).round(2)
-                    g.axes[i, j].annotate(f'r = {corr}', 
-                                          xy=(0.5, 0.9), 
-                                          xycoords='axes fraction',
-                                          ha='center',
-                                          va='center',
-                                          fontsize=10,
-                                          bbox=dict(boxstyle='round,pad=0.5', 
-                                                    fc='white', 
-                                                    alpha=0.8))
+        cmap = sns.diverging_palette(230, 20, as_cmap=True)
         
-        plt.suptitle('Relationships Between Performance Variables', 
-                     fontsize=16, y=1.02)
+        sns.heatmap(corr_matrix, mask=mask, cmap=cmap, vmax=1, vmin=-1, center=0,
+                  square=True, linewidths=.5, cbar_kws={"shrink": .5}, annot=True)
+        
+        for i, row in enumerate(corr_matrix.index):
+            for j, col in enumerate(corr_matrix.columns):
+                if i > j:
+                    corr_value = corr_matrix.iloc[i, j]
+                    p_value = p_values.iloc[i, j]
+                    
+                    if p_value < 0.001:
+                        plt.text(j+0.5, i+0.85, '***', ha='center', va='center', color='white' if abs(corr_value) > 0.4 else 'black')
+                    elif p_value < 0.01:
+                        plt.text(j+0.5, i+0.85, '**', ha='center', va='center', color='white' if abs(corr_value) > 0.4 else 'black')
+                    elif p_value < 0.05:
+                        plt.text(j+0.5, i+0.85, '*', ha='center', va='center', color='white' if abs(corr_value) > 0.4 else 'black')
+        
+        plt.title('Enhanced Correlation Matrix with Significance Levels', fontsize=14)
         plt.tight_layout()
         
-        # Convert plot to base64 image
         buf = BytesIO()
         plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
         buf.seek(0)
@@ -102,18 +105,130 @@ class AnalysisService:
         
         return {
             'base64': f'data:image/png;base64,{image_base64}',
-            'title': 'Scatterplot Matrix of Performance Variables'
+            'title': 'Enhanced Correlation Matrix'
+        }
+
+    def generate_scatterplot_matrix(self, df):
+        """Generate an optimized scatterplot matrix using seaborn pairplot."""
+        perf_vars = ['performanceScore', 'timeToFindExtinguisher', 'timeToExtinguishFire', 
+                     'timeToTriggerAlarm', 'timeToFindExit']
+        vars_to_use = [var for var in perf_vars if var in df.columns]
+        if len(vars_to_use) < 2:
+            return None
+        plot_df = df[vars_to_use].dropna()
+        if len(plot_df) > 100:
+            plot_df = plot_df.sample(n=100, random_state=42)
+        try:
+            import seaborn as sns
+            from io import BytesIO
+            import base64
+            g = sns.pairplot(plot_df, diag_kind='kde', corner=True, plot_kws={'alpha': 0.6})
+            g.fig.suptitle('Scatterplot Matrix', fontsize=14)
+            g.fig.tight_layout()
+            buf = BytesIO()
+            g.fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+            buf.seek(0)
+            image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+            plt.close(g.fig)
+            return {
+                'base64': f'data:image/png;base64,{image_base64}',
+                'title': 'Scatterplot Matrix'
+            }
+        except Exception as e:
+            print(f"Scatterplot matrix generation error: {str(e)}")
+            return None
+
+    def generate_task_completion_speed(self, df):
+        """Generate a box plot for task completion speed for a professional look."""
+        event_cols = ['timeToFindExtinguisher', 'timeToExtinguishFire', 'timeToTriggerAlarm', 'timeToFindExit']
+        available = [col for col in event_cols if col in df.columns]
+        if not available:
+            return None
+        # Melt the dataframe for a unified box plot
+        df_melt = df[available].melt(var_name='Task', value_name='Time')
+        plt.figure(figsize=(8, 6))
+        ax = sns.boxplot(x='Task', y='Time', data=df_melt, palette='Set2')
+        plt.xlabel('Task')
+        plt.ylabel('Completion Time (s)')
+        plt.title('Task Completion Speed')
+        plt.grid(True, alpha=0.3)
+        buf = BytesIO()
+        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        buf.seek(0)
+        image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        plt.close()
+        return {
+            'base64': f'data:image/png;base64,{image_base64}',
+            'title': 'Task Completion Speed'
+        }
+
+    def generate_feature_impact(self, df):
+        """Generate a bar chart for feature impact based on correlation with performance."""
+        features = ['timeToFindExtinguisher', 'timeToExtinguishFire', 'timeToTriggerAlarm', 'timeToFindExit']
+        if 'performanceScore' not in df.columns:
+            return None
+        available = [f for f in features if f in df.columns]
+        if not available:
+            return None
+        correlations = {feat: df[feat].corr(df['performanceScore']) for feat in available}
+        corr_series = pd.Series(correlations).sort_values(ascending=False)
+        plt.figure(figsize=(8, 6))
+        ax = sns.barplot(x=corr_series.index, y=corr_series.values, palette='coolwarm')
+        plt.xlabel('Feature')
+        plt.ylabel('Correlation with Performance')
+        plt.title('Feature Impact')
+        plt.grid(True, alpha=0.3)
+        buf = BytesIO()
+        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        buf.seek(0)
+        image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        plt.close()
+        return {
+            'base64': f'data:image/png;base64,{image_base64}',
+            'title': 'Feature Impact'
+        }
+
+    def generate_performance_trend(self, df):
+        """Generate a line plot of daily average performance scores with smoothing even if data is sparse."""
+        if 'timestamp' not in df.columns or 'performanceScore' not in df.columns:
+            return None
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        trend = df.groupby(df['timestamp'].dt.date)['performanceScore'].mean().reset_index()
+        trend = trend.sort_values('timestamp')
+        
+        # Always apply smoothing: use window size 3 if possible, or fallback to 1
+        window_size = 3 if len(trend) >= 3 else 1
+        trend['smoothed'] = trend['performanceScore'].rolling(window=window_size, min_periods=1, center=True).mean()
+        
+        plt.figure(figsize=(8, 6))
+        plt.plot(trend['timestamp'], trend['smoothed'], marker='o', linestyle='-', color='royalblue', label='Smoothed Trend')
+        plt.scatter(trend['timestamp'], trend['performanceScore'], color='gray', alpha=0.5, label='Daily Average')
+        plt.xlabel('Date')
+        plt.ylabel('Avg. Performance Score')
+        plt.title('Longitudinal Performance Trend')
+        plt.xticks(rotation=45)
+        plt.grid(True, alpha=0.3)
+        plt.legend()
+        plt.tight_layout()
+        
+        buf = BytesIO()
+        plt.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+        buf.seek(0)
+        image_base64 = base64.b64encode(buf.getvalue()).decode('utf-8')
+        plt.close()
+        
+        return {
+            'base64': f'data:image/png;base64,{image_base64}',
+            'title': 'Longitudinal Performance Trend'
         }
 
     def generate_report(self, df, latest_record):
-        # Clean data
         event_columns = ['timeToFindExtinguisher', 'timeToExtinguishFire', 'timeToTriggerAlarm', 'timeToFindExit']
         score_column = 'performanceScore'
         
         for col in event_columns:
             df[col] = df[col].apply(lambda x: np.nan if x < 0 else x)
         
-        # Compute percentiles
         metrics = {}
         all_metrics = event_columns + [score_column]
         
@@ -126,18 +241,32 @@ class AnalysisService:
                     "percentile": percentile
                 }
         
-        # Generate graphs
         graphs_html = {}
-        for col in all_metrics:
+        for col in ['timeToFindExtinguisher', 'timeToExtinguishFire', 'timeToTriggerAlarm', 'timeToFindExit',
+                    'performanceScore']:
             if col in df.columns:
                 graphs_html[col] = self.generate_metric_graph(col, latest_record[col], df[col])
         
-        # Add scatterplot matrix to the report
-        scatterplot_matrix = self.generate_scatterplot_matrix(df)
-        if scatterplot_matrix:
-            graphs_html['scatterplot_matrix'] = f'<img src="{scatterplot_matrix["base64"]}" alt="Scatterplot Matrix" style="max-width:600px;"/>'
+        enhanced_heatmap = self.generate_enhanced_correlation_heatmap(df)
+        if enhanced_heatmap:
+            graphs_html['enhanced_heatmap'] = f'<img src="{enhanced_heatmap["base64"]}" alt="Enhanced Correlation Heatmap" style="max-width:600px;"/>'
         
-        # Create HTML report
+        scatter_matrix = self.generate_scatterplot_matrix(df)
+        if scatter_matrix:
+            graphs_html['scatterplot_matrix'] = f'<img src="{scatter_matrix["base64"]}" alt="Scatterplot Matrix" style="max-width:600px;"/>'
+        
+        task_speed = self.generate_task_completion_speed(df)
+        if task_speed:
+            graphs_html['performance_by_task_completion_speed'] = f'<img src="{task_speed["base64"]}" alt="Task Completion Speed" style="max-width:600px;"/>'
+        
+        feature_impact = self.generate_feature_impact(df)
+        if feature_impact:
+            graphs_html['feature_impact'] = f'<img src="{feature_impact["base64"]}" alt="Feature Impact" style="max-width:600px;"/>'
+        
+        performance_trend = self.generate_performance_trend(df)
+        if performance_trend:
+            graphs_html['performance_trend'] = f'<img src="{performance_trend["base64"]}" alt="Performance Trend Over Time" style="max-width:600px;"/>'
+        
         report_html = "<h1>Latest Performance Report</h1>"
         report_html += f"<p>Date: {pd.to_datetime('today').strftime('%Y-%m-%d')}</p>"
         
@@ -155,7 +284,6 @@ class AnalysisService:
         
         report_html += "<h2>Visualizations</h2>"
         for metric, img_html in graphs_html.items():
-            report_html += f"<h3>{metric}</h3>"
-            report_html += img_html
+            report_html += f"<h3>{metric.replace('_',' ').title()}</h3>{img_html}"
         
         return report_html

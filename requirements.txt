@@ -14,3 +14,4 @@ fastapi-cache2
 Pillow
 redis
 jinja2
+openpyxl

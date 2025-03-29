@@ -12,7 +12,7 @@
     <!-- Header -->
     <div class="dashboard-header">
         <div class="container">
-            <h1 class="display-4">Inferno VR Fire-Safety Training</h1>
+            <h1 class="display-4"><span class="improved-header-text">Inferno VR Fire-Safety Training</span></h1>
             <p class="lead">Research Analytics Dashboard</p>
             <p class="dashboard-subtitle">A comprehensive analysis of virtual reality training performance metrics</p>
         </div>
@@ -219,10 +219,10 @@
                 <!-- Performance by Task Completion Speed -->
                 <div class="chart-container">
                     <h3><i class="fas fa-tachometer-alt"></i> Performance by Task Completion Speed</h3>
-                    {% if plots.performance_by_task_speed %}
-                    <img src="{{ plots.performance_by_task_speed.base64 }}" class="responsive-chart" alt="Performance by Task Speed">
+                    {% if plots.performance_by_task_completion_speed %}
+                    <img src="{{ plots.performance_by_task_completion_speed.base64 }}" class="responsive-chart" alt="Task Completion Speed">
                     <div class="chart-description">
-                        Relationship between task completion speed and overall performance scores
+                        Average task completion times across simulation events.
                     </div>
                     {% else %}
                     <p class="no-data">No task speed data available</p>
@@ -234,8 +234,8 @@
                     <h3><i class="fas fa-lightbulb"></i> Performance Insights</h3>
                     <ul>
                         <li>Task completion speed significantly correlates with overall performance</li>
-                        <li>Scene complexity has a measurable impact on participant success rates</li>
-                        <li>Difficulty settings show expected performance gradients, validating the training design</li>
+                        <li>Scene complexity shows measurable impacts</li>
+                        <li>Difficulty settings reveal expected performance gradients</li>
                     </ul>
                 </div>
             </div>
@@ -249,7 +249,7 @@
                             {% if plots.correlation_matrix %}
                             <img src="{{ plots.correlation_matrix.base64 }}" class="responsive-chart" alt="Correlation Matrix">
                             <div class="chart-description">
-                                Heatmap showing correlations between different performance metrics
+                                Heatmap showing relationships among performance metrics.
                             </div>
                             {% else %}
                             <p class="no-data">No correlation data available</p>
@@ -257,14 +257,14 @@
                         </div>
                     </div>
                     
-                    <!-- Feature Impact -->
+                    <!-- Feature Impact Analysis -->
                     <div class="column">
                         <div class="chart-container">
-                            <h3><i class="fas fa-impact"></i> Feature Impact</h3>
+                            <h3><i class="fas fa-chart-pie"></i> Feature Impact Analysis</h3>
                             {% if plots.feature_impact %}
-                            <img src="{{ plots.feature_impact.base64 }}" class="responsive-chart" alt="Feature Impact">
+                            <img src="{{ plots.feature_impact.base64 }}" class="responsive-chart" alt="Feature Impact Analysis">
                             <div class="chart-description">
-                                Relative importance of each metric in determining overall performance
+                                Analysis of how individual tasks influence overall performance.
                             </div>
                             {% else %}
                             <p class="no-data">No feature impact data available</p>
@@ -273,37 +273,40 @@
                     </div>
                 </div>
                 
-                <!-- NEW: Scatterplot Matrix -->
-                <div class="chart-container">
-                    <h3><i class="fas fa-braille"></i> Scatterplot Matrix</h3>
-                    {% if plots.scatterplot_matrix %}
-                    <img src="{{ plots.scatterplot_matrix.base64 }}" class="responsive-chart" alt="Scatterplot Matrix">
-                    <div class="chart-description">
-                        Multi-dimensional analysis of relationships between key performance variables with correlation coefficients
+                <!-- Scatterplot Matrix Analysis -->
+                <div class="row">
+                    <div class="column">
+                        <div class="chart-container">
+                            <h3><i class="fas fa-sliders-h"></i> Scatterplot Matrix Analysis</h3>
+                            {% if plots.scatterplot_matrix %}
+                            <img src="{{ plots.scatterplot_matrix.base64 }}" class="responsive-chart" alt="Scatterplot Matrix">
+                            <div class="chart-description">
+                                Pairwise scatterplots highlighting inter-metric relationships.
+                            </div>
+                            {% else %}
+                            <p class="no-data">Scatterplot matrix not available</p>
+                            {% endif %}
+                        </div>
                     </div>
-                    {% else %}
-                    <p class="no-data">Not enough data for scatterplot matrix analysis</p>
-                    {% endif %}
                 </div>
                 
-                <!-- Correlation insights -->
                 <div class="insights-panel">
                     <h3><i class="fas fa-lightbulb"></i> Correlation Insights</h3>
                     <ul>
-                        <li>Strong correlations exist between task completion times and overall performance</li>
-                        <li>The scatterplot matrix reveals key relationships between performance variables</li>
-                        <li>Feature impact analysis helps identify the most critical training components</li>
+                        <li>Strong relationships exist between task times and overall performance.</li>
+                        <li>Feature impact analysis identifies the most influential training components.</li>
+                        <li>Correlation matrices provide a holistic view of metric interdependencies.</li>
                     </ul>
                 </div>
             </div>
             
             <div class="tab-content" id="time-analysis">
                 <div class="chart-container">
-                    <h3><i class="fas fa-chart-line"></i> Performance Trend Over Time</h3>
+                    <h3><i class="fas fa-chart-line"></i> Longitudinal Performance Trend</h3>
                     {% if plots.performance_trend %}
-                    <img src="{{ plots.performance_trend.base64 }}" class="responsive-chart" alt="Performance Trend">
+                    <img src="{{ plots.performance_trend.base64 }}" class="responsive-chart" alt="Performance Trend Over Time">
                     <div class="chart-description">
-                        Longitudinal analysis of performance scores over time with trend line
+                        Daily average performance scores with trend analysis.
                     </div>
                     {% else %}
                     <p class="no-data">Not enough time-series data available</p>
@@ -359,9 +362,9 @@
                 <div class="insights-panel">
                     <h3><i class="fas fa-lightbulb"></i> Temporal Insights</h3>
                     <ul>
-                        <li>Performance metrics show improvement over time, suggesting learning effects</li>
-                        <li>Weekly and monthly aggregations reveal patterns in training effectiveness</li>
-                        <li>Task completion times show a decreasing trend, indicating improved efficiency</li>
+                        <li>Performance metrics show learning effects over time</li>
+                        <li>Weekly and monthly trends highlight training efficiency</li>
+                        <li>Task times exhibit a decreasing trend with repetition</li>
                     </ul>
                 </div>
             </div>
@@ -406,10 +409,10 @@
                     <h3><i class="fas fa-download"></i> Export Options</h3>
                     <p>Download this data for further research analysis:</p>
                     <div class="export-buttons">
-                        <button class="export-button" onclick="alert('Export to CSV functionality would be implemented here')">
+                        <button class="export-button" id="csv-export">
                             <i class="fas fa-file-csv"></i> Export to CSV
                         </button>
-                        <button class="export-button" onclick="alert('Export to Excel functionality would be implemented here')">
+                        <button class="export-button" id="excel-export">
                             <i class="fas fa-file-excel"></i> Export to Excel
                         </button>
                     </div>
